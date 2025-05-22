@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberMeal Planner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0d0d12;
+            color: #00ff9d;
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+        }
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #ff2a7f;
+            text-shadow: 0 0 5px #00ff9d;
+        }
+        .day {
+            border: 1px solid #00ff9d;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .inventory {
+            margin-bottom: 30px;
+        }
+        .inventory input {
+            margin: 10px;
+            padding: 8px;
+            width: 200px;
+        }
+        .inventory button {
+            padding: 8px 16px;
+            margin-left: 5px;
+            background-color: #ff2a7f;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .meal-item {
+            margin: 5px 0;
+        }
+        .generate-btn {
+            background-color: #00ff9d;
+            color: #000;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            border: 2px solid #ff2a7f;
+            font-family: 'Press Start 2P', cursive;
+        }
+        .generate-btn:hover {
+            background-color: #00e08e;
+        }
+    </style>
+</head>
+<body>
+    <h1>CyberMeal Planner</h1>
+    
+    <div class="inventory">
+        <h2>Inventory</h2>
+        <div id="inventoryControls">
+            <!-- Inventory controls will be populated by JavaScript -->
+        </div>
+        <button class="generate-btn" onclick="generateMealPlan()">GENERATE</button>
+    </div>
+    
+    <div id="mealPlan">
+        <!-- Meal plan will be generated here -->
+    </div>
+
+    <script>
+        // Meal database with inventory tracking
+        let meals = {
+            "Meals": ["Egg Sandwich", "Chicken Nuggets", "Dumplings", "Panini", "Big Sandwich"],
+            "Snacks": ["Protein Bar", "Fruit", "Yogurt", "Nuts", "Granola"]
+        };
+
+        // Initialize inventory from localStorage
+        let inventory = JSON.parse(localStorage.getItem('mealInventory')) || {
+            "Meals": {},
+            "Snacks": {}
+        };
+
+        // Set initial inventory counts
+        if (Object.keys(inventory.Meals).length === 0) {
+            meals["Meals"].forEach(item => inventory.Meals[item] = 3);
+        }
+        if (Object.keys(inventory.Snacks).length === 0) {
+            meals["Snacks"].forEach(item => inventory.Snacks[item] = 3);
+        }
+
+        // Save inventory to localStorage
+        function saveInventory() {
+            localStorage.setItem('mealInventory', JSON.stringify(inventory));
+        }
+
+        // Generate meal plan with no repeats in last 2 days
+        function generateMealPlan() {
+            const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const plan = {};
+            const usedMeals = [];
+
+            for (let i = 0; i < 7; i++) {
+                const dayMeals = {
+                    meals: [],
+                    snacks: []
+                };
+
+                // Select 3 meals
+                while (dayMeals.meals.length < 3) {
+                    const category = "Meals";
+                    const available = Object.keys(inventory[category]).filter(item => 
+                        inventory[category][item] > 0 && !usedMeals.includes(item)
+                    );
+                    
+                    if (available.length) {
+                        const meal = available[Math.floor(Math.random() * available.length)];
+                        dayMeals.meals.push(meal);
+                        usedMeals.push(meal);
+                        inventory[category][meal]--;
+                    }
+                }
+
+                // Select 2-3 snacks
+                const snackCount = Math.floor(Math.random() * 2) + 2;
+                while (dayMeals.snacks.length < snackCount) {
+                    const category = "Snacks";
+                    const available = Object.keys(inventory[category]).filter(item => 
+                        inventory[category][item] > 0 && !usedMeals.includes(item)
+                    );
+                    
+                    if (available.length) {
+                        const snack = available[Math.floor(Math.random() * available.length)];
+                        dayMeals.snacks.push(snack);
+                        usedMeals.push(snack);
+                        inventory[category][snack]--;
+                    }
+                }
+
+                plan[days[i]] = dayMeals;
+                // Keep only last 2 meals for repetition tracking
+                if (usedMeals.length > 2) usedMeals.shift();
+            }
+
+            // Update UI with new plan
+            updateMealPlanDisplay(plan);
+            saveInventory();
+        }
+
+        // Create inventory controls
+        function createInventoryControls() {
+            const container = document.getElementById('inventoryControls');
+            container.innerHTML = '';
+
+            // Create controls for meals
+            const mealGroup = document.createElement('div');
+            mealGroup.innerHTML = '<h3>Meals</h3>';
+            meals["Meals"].forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'meal-item';
+                div.innerHTML = `
+                    <span>${item}</span>
+                    <button onclick="updateInventory('Meals', '${item}', -1)">-</button>
+                    <span id="mealCount_${item}">${inventory.Meals[item] || 3}</span>
+                    <button onclick="updateInventory('Meals', '${item}', 1)">+</button>
+                `;
+                mealGroup.appendChild(div);
+            });
+            container.appendChild(mealGroup);
+
+            // Create controls for snacks
+            const snackGroup = document.createElement('div');
+            snackGroup.innerHTML = '<h3>Snacks</h3>';
+            meals["Snacks"].forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'meal-item';
+                div.innerHTML = `
+                    <span>${item}</span>
+                    <button onclick="updateInventory('Snacks', '${item}', -1)">-</button>
+                    <span id="snackCount_${item}">${inventory.Snacks[item] || 3}</span>
+                    <button onclick="updateInventory('Snacks', '${item}', 1)">+</button>
+                `;
+                snackGroup.appendChild(div);
+            });
+            container.appendChild(snackGroup);
+        }
+
+        // Update inventory display
+        function updateInventoryDisplay() {
+            meals["Meals"].forEach(item => {
+                document.getElementById(`mealCount_${item}`).textContent = inventory.Meals[item];
+            });
+            meals["Snacks"].forEach(item => {
+                document.getElementById(`snackCount_${item}`).textContent = inventory.Snacks[item];
+            });
+        }
+
+        // Update inventory counts
+        function updateInventory(category, item, change) {
+            inventory[category][item] = Math.max(0, inventory[category][item] + change);
+            updateInventoryDisplay();
+            saveInventory();
+        }
+
+        // Display meal plan
+        function updateMealPlanDisplay(plan) {
+            const container = document.getElementById('mealPlan');
+            container.innerHTML = '';
+            
+            Object.entries(plan).forEach(([day, mealsData]) => {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day';
+                dayDiv.innerHTML = `
+                    <h2>${day}</h2>
+                    <div>
+                        <h3>Main Meals</h3>
+                        ${mealsData.meals.map(m => `<p>${m}</p>`).join('')}
+                        <h3>Snacks</h3>
+                        ${mealsData.snacks.map(s => `<p>• ${s}</p>`).join('')}
+                    </div>
+                `;
+                container.appendChild(dayDiv);
+            });
+        }
+
+        // Initialize on load
+        window.onload = () => {
+            createInventoryControls();
+            updateInventoryDisplay();
+            generateMealPlan();
+        };
+    </script>
+</body>
+</html>
